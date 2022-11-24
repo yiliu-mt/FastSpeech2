@@ -17,7 +17,8 @@ def get_model(args, configs, device, train=False):
             train_config["path"]["ckpt_path"],
             "{}.pth.tar".format(args.restore_step),
         )
-        ckpt = torch.load(ckpt_path)
+        print("Restore from {}".format(ckpt_path))
+        ckpt = torch.load(ckpt_path, map_location=device)
         model.load_state_dict(ckpt["model"])
 
     if train:
@@ -67,6 +68,48 @@ def get_vocoder(config, device):
         vocoder.eval()
         vocoder.remove_weight_norm()
         vocoder.to(device)
+
+    return vocoder
+
+def get_vocoder(config, device, vocoder_path=None, vocoder_config=None):
+    name = config["vocoder"]["model"]
+    speaker = config["vocoder"]["speaker"]
+
+    if name == "MelGAN":
+        if speaker == "LJSpeech":
+            vocoder = torch.hub.load(
+                "descriptinc/melgan-neurips", "load_melgan", "linda_johnson"
+            )
+        elif speaker == "universal":
+            vocoder = torch.hub.load(
+                "descriptinc/melgan-neurips", "load_melgan", "multi_speaker"
+            )
+        else:
+            raise NotImplementedError
+        vocoder.mel2wav.eval()
+        vocoder.mel2wav.to(device)
+    elif name == "HiFi-GAN":
+        vocoder_config = vocoder_config if vocoder_config is not None else "./vocoder/hifigan/config.json" 
+        print(f"Loading vocoder config from {vocoder_config}")
+        with open(vocoder_config, "r") as f:
+            config = json.load(f)
+        config = hifigan.AttrDict(config)
+        vocoder = hifigan.Generator(config)
+        if vocoder_path is None:
+            if speaker == "LJSpeech":
+                vocoder_path = "./vocoder/hifigan/generator_LJSpeech.pth.tar"
+            elif speaker == "universal":
+                vocoder_path = "./vocoder/hifigan/generator_universal.pth.tar"
+            elif speaker == "Mita":
+                vocoder_path = "./vocoder/hifigan/generator_Mita.pth.tar"
+        print(f"Loading vocoder from {vocoder_path}")
+        ckpt = torch.load(vocoder_path, map_location=device)
+        vocoder.load_state_dict(ckpt["generator"])
+        vocoder.eval()
+        vocoder.remove_weight_norm()
+        vocoder.to(device)
+    else:
+        raise NotImplementedError
 
     return vocoder
 

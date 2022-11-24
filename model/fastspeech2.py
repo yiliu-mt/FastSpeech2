@@ -1,5 +1,6 @@
 import os
 import json
+import time
 
 import torch
 import torch.nn as nn
@@ -63,6 +64,7 @@ class FastSpeech2(nn.Module):
             else None
         )
 
+        start_time = time.time()
         output = self.encoder(texts, src_masks)
 
         if self.speaker_emb is not None:
@@ -96,6 +98,7 @@ class FastSpeech2(nn.Module):
 
         postnet_output = self.postnet(output) + output
 
+        use_time = time.time() - start_time
         return (
             output,
             postnet_output,
@@ -107,4 +110,4 @@ class FastSpeech2(nn.Module):
             mel_masks,
             src_lens,
             mel_lens,
-        )
+        ), use_time

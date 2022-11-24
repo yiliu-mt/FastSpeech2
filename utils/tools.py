@@ -1,5 +1,6 @@
 import os
 import json
+import time
 
 import torch
 import torch.nn.functional as F
@@ -199,15 +200,20 @@ def synth_samples(targets, predictions, vocoder, model_config, preprocess_config
 
     from .model import vocoder_infer
 
+    start_time = time.time()
     mel_predictions = predictions[1].transpose(1, 2)
     lengths = predictions[9] * preprocess_config["preprocessing"]["stft"]["hop_length"]
     wav_predictions = vocoder_infer(
         mel_predictions, vocoder, model_config, preprocess_config, lengths=lengths
     )
+    voc_time = time.time() - start_time
 
     sampling_rate = preprocess_config["preprocessing"]["audio"]["sampling_rate"]
+    wav_dur = 0
     for wav, basename in zip(wav_predictions, basenames):
         wavfile.write(os.path.join(path, "{}.wav".format(basename)), sampling_rate, wav)
+        wav_dur += wav.shape[0] / sampling_rate
+    return voc_time, wav_dur
 
 
 def plot_mel(data, stats, titles):
